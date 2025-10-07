@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aztec Jump</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: 'Poppins', sans-serif;
+      background-image: url(./images/Screenshot\ 2025-10-06\ at\ 11.27.19\ PM.png) ;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      inset: 0;
+      z-index: -2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      color: white;
+      
+    
+    }
+    @font-face {
+      font-family: font;
+      src: url(./fonnts.com-Aeonik-Bold.ttf);
+    }
+    
+    .game-container {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    canvas {
+      border-radius: 1rem;
+      background: black;
+    }
+    .hud {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(6px);
+      border-radius: 10px;
+      padding: 10px 15px;
+      font-size: 14px; 
+      line-height: 1.4;
+    }
+    .hud div {
+      margin: 2px 0;
+    }
+    .btn {
+      padding: 15px 25px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      background: #d4ff28;
+      border: none;
+      color: rgb(15, 15, 15);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+    }
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: #260d07df;
+      /* backdrop-filter: blur(5px); */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 5;
+      flex-direction: column;
+      text-align: center;
+      background: rgba(38, 13, 7, 0.4); /* your color with 40% opacity */
+  backdrop-filter: blur(20px);      /* creates the frosted-glass effect */
+  -webkit-backdrop-filter: blur(10px); /* for Safari */
+  /* border: 1px solid rgba(255, 255, 255, 0.1); subtle edge highlight */
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5); /* optional depth */
+  border-radius: 0.8rem;
+
+    }
+    .overlay h1, .overlay h2 {
+      margin-bottom: 10px;
+      background: whitesmoke;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-size: 2.5rem;
+      
+    }
+    .info {
+      color: #d4ff28;
+      font-size: 0.9rem;
+      margin-top: 8px;
+    }
+    @media (max-width: 768px) {
+    canvas {
+      width: 320px;
+      height: 500px;
+      background: rgba(0, 0, 0, 0.6);
+    }
+
+    .overlay h1, .overlay h2 {
+      font-size: 1.8rem;
+    }
+
+    .btn {
+      padding: 12px 20px;
+      font-size: 1rem;
+    }
+
+    .hud {
+      font-size: 12px;
+      padding: 8px 10px;
+    }
+  }
+
+  /* 📱 VERY SMALL SCREENS */
+  @media (max-width: 480px) {
+    canvas {
+      width: 97vw;
+      height: 97vh;
+    }
+  }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <canvas id="gameCanvas" width="450" height="800"></canvas>
+
+    <div class="hud">
+      <div id="score">Score: 0</div>
+      <div id="height">Height: 0m</div>
+      <div id="time">Time: 0s</div>
+      <div id="best">Best: 0</div>
+    </div>
+
+    <div id="menu" class="overlay">
+      <h1>Honk Rush</h1>
+      <p class="info">Honk if you plonk! 🦆</p>
+      <button class="btn" id="startBtn">Start Jumping</button>
+    </div>
+
+    <div id="gameOver" class="overlay" style="display:none;">
+      <h2>Game Over</h2>
+      <div id="finalStats"></div>
+      <button class="btn" id="restartBtn">Play Again</button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+  
+    const startBtn = document.getElementById("startBtn");
+    const restartBtn = document.getElementById("restartBtn");
+    const menu = document.getElementById("menu");
+    const gameOverScreen = document.getElementById("gameOver");
+    const finalStats = document.getElementById("finalStats");
+  
+    const scoreDisplay = document.getElementById("score");
+    const heightDisplay = document.getElementById("height");
+    const timeDisplay = document.getElementById("time");
+    const bestDisplay = document.getElementById("best");
+  
+    let gameState = "menu";
+    let highScore = 0;
+    let game, keys = {};
+  
+    // 🟡 Default player image (used both in menu & game)
+    const playerImage = new Image();
+    playerImage.src = "images/monty-mole.webp"; // replace with your Honk image path
+  
+    // Add Honk image preview above Start button
+    const charPreview = document.createElement("div");
+    charPreview.style.display = "flex";
+    charPreview.style.justifyContent = "center";
+    charPreview.style.marginBottom = "1rem";
+  
+    const img = document.createElement("img");
+    img.src = playerImage.src;
+    img.style.width = "6rem";
+    img.style.height = "7rem";
+    img.style.borderRadius = "50%";
+    img.style.transition = "transform 0.3s ease";
+    img.style.transform = "scale(1.05)";
+    charPreview.appendChild(img);
+  
+    menu.insertBefore(charPreview, startBtn);
+  
+    // 🎵 Background Music Setup
+    const bgMusic = new Audio("sound/kendrick.mp3"); // replace with your file
+    bgMusic.loop = true;
+    bgMusic.volume = 0;
+  
+    function fadeInMusic() {
+      let vol = 0;
+      const fade = setInterval(() => {
+        if (vol < 0.5) {
+          vol += 0.05;
+          bgMusic.volume = vol;
+        } else clearInterval(fade);
+      }, 200);
+    }
+  
+    function fadeOutMusic() {
+      let vol = bgMusic.volume;
+      const fade = setInterval(() => {
+        if (vol > 0) {
+          vol -= 0.05;
+          bgMusic.volume = Math.max(vol, 0);
+        } else {
+          clearInterval(fade);
+          bgMusic.pause();
+        }
+      }, 200);
+    }
+  
+    function initGame() {
+      game = {
+        player: { x: canvas.width / 2, y: 300, vx: 0, vy: 0, w: 65, h: 75, grounded: false },
+        platforms: [],
+        camera: { y: 0 },
+        score: 0,
+        maxHeight: 0,
+        startTime: Date.now(),
+      };
+      for (let i = 0; i < 10; i++) {
+        game.platforms.push({
+          x: Math.random() * (canvas.width - 100),
+          y: 400 - i * 80,
+          w: 80 + Math.random() * 40,
+          h: 15,
+          type: Math.random() > 0.8 ? "boost" : "normal"
+        });
+      }
+    }
+  
+    function startGame() {
+      menu.style.display = "none";
+      gameOverScreen.style.display = "none";
+      initGame();
+      gameState = "playing";
+  
+      // 🎶 Start music with fade in
+      bgMusic.currentTime = 0;
+      bgMusic.play().then(() => fadeInMusic()).catch(() => {
+        console.log("User interaction required to start audio");
+      });
+  
+      requestAnimationFrame(loop);
+    }
+  
+    function endGame() {
+      gameState = "gameOver";
+      if (game.score > highScore) highScore = game.score;
+      bestDisplay.textContent = "Best: " + highScore;
+      finalStats.innerHTML = `
+        <p>Final Score: <b>${game.score}</b></p>
+        <p>Max Height: <b>${game.maxHeight}m</b></p>
+        <p>Time: <b>${((Date.now() - game.startTime) / 1000).toFixed(1)}s</b></p>
+      `;
+      gameOverScreen.style.display = "flex";
+  
+      // ⏸ Fade out and stop music
+      fadeOutMusic();
+    }
+  
+    function loop() {
+      if (gameState !== "playing") return;
+  
+      const dt = 1;
+      const p = game.player;
+  
+      if (keys["ArrowLeft"] || keys["a"]) p.vx = -6;
+      else if (keys["ArrowRight"] || keys["d"]) p.vx = 6;
+      else p.vx *= 0.85;
+  
+      if (!p.grounded) p.vy += 0.8 * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+  
+      if (p.x < -p.w) p.x = canvas.width;
+      if (p.x > canvas.width) p.x = -p.w;
+  
+      p.grounded = false;
+      for (const plat of game.platforms) {
+        if (
+          p.vy > 0 &&
+          p.x + p.w > plat.x &&
+          p.x < plat.x + plat.w &&
+          p.y + p.h > plat.y &&
+          p.y + p.h < plat.y + plat.h + 10
+        ) {
+          p.y = plat.y - p.h;
+          p.vy = plat.type === "boost" ? -22 : -15;
+          p.grounded = true;
+  
+          const platformScore = Math.floor(-plat.y / 80);
+          if (platformScore > game.score) game.score = platformScore;
+        }
+      }
+  
+      if (p.y < canvas.height / 2) {
+        game.camera.y = p.y - canvas.height / 2;
+      }
+  
+      const currentHeight = Math.max(0, Math.floor(-game.camera.y / 10));
+      if (currentHeight > game.maxHeight) game.maxHeight = currentHeight;
+  
+      const highestY = Math.min(...game.platforms.map(pl => pl.y));
+      if (highestY > game.camera.y - canvas.height) {
+        game.platforms.push({
+          x: Math.random() * (canvas.width - 100),
+          y: highestY - 80,
+          w: 80 + Math.random() * 40,
+          h: 15,
+          type: Math.random() > 0.85 ? "boost" : "normal"
+        });
+      }
+  
+      game.platforms = game.platforms.filter(p => p.y < game.camera.y + canvas.height + 100);
+  
+      if (p.y > game.camera.y + canvas.height) {
+        endGame();
+        return;
+      }
+  
+      scoreDisplay.textContent = "Score: " + game.score;
+      heightDisplay.textContent = "Height: " + game.maxHeight + "m";
+      timeDisplay.textContent = "Time: " + ((Date.now() - game.startTime) / 1000).toFixed(1) + "s";
+  
+      draw();
+      requestAnimationFrame(loop);
+    }
+  
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+      const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      gradient.addColorStop(0, "rgba(38, 13, 7, 0.4)");
+      gradient.addColorStop(1, "rgba(38, 13, 7, 0.4)");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+      ctx.save();
+      ctx.translate(0, -game.camera.y);
+  
+      game.platforms.forEach(plat => {
+        if (plat.type === "boost") {
+          const grad = ctx.createLinearGradient(plat.x, plat.y, plat.x + plat.w, plat.y);
+          grad.addColorStop(0, "#fbbf24");
+          grad.addColorStop(1, "#f59e0b");
+          ctx.fillStyle = grad;
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = "#fbbf24";
+        } else {
+          ctx.fillStyle = "#f5f5f5";
+          ctx.shadowBlur = 5;
+          ctx.shadowColor = "#f5f5f5";
+        }
+        ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
+        ctx.shadowBlur = 0;
+      });
+  
+      const p = game.player;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+  
+      if (playerImage.complete) {
+        ctx.beginPath();
+        ctx.arc(p.w / 2, p.h / 2, p.w / 2, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(playerImage, 0, 0, p.w, p.h);
+      } else {
+        ctx.fillStyle = "#fbbf24";
+        ctx.fillRect(0, 0, p.w, p.h);
+      }
+  
+      ctx.restore();
+      ctx.restore();
+    }
+  
+    window.addEventListener("keydown", e => {
+      keys[e.key] = true;
+      if (e.key === " " && game.player.grounded) {
+        game.player.vy = -15;
+        game.player.grounded = false;
+      }
+    });
+    window.addEventListener("keyup", e => (keys[e.key] = false));
+  
+    startBtn.addEventListener("click", startGame);
+    restartBtn.addEventListener("click", startGame);
+  </script>
+  
+
+  
+  
+  
+</body>
+</html>
