@@ -130,6 +130,19 @@
       width: 97vw;
       height: 97vh;
     }
+    .overlay h1, .overlay h2 {
+      margin-bottom: 10px;
+      background: whitesmoke;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-size: 3.2rem;
+    }
+    .info {
+      color: #d4ff28;
+      font-size: 1.4rem;
+      margin-top: 8px;
+    }
+    
   }
   </style>
 </head>
@@ -175,17 +188,17 @@
     let gameState = "menu";
     let highScore = 0;
     let game, keys = {};
+    let isMobile = window.innerWidth < 768; // 📱 Detect mobile
   
     // 🟡 Default player image
     const playerImage = new Image();
-    playerImage.src = "images/monty-mole.webp"; // replace with your image path
+    playerImage.src = "images/monty-mole.webp"; // replace with your image
   
-    // Character preview above Start button
+    // Character preview in menu
     const charPreview = document.createElement("div");
     charPreview.style.display = "flex";
     charPreview.style.justifyContent = "center";
     charPreview.style.marginBottom = "1rem";
-  
     const img = document.createElement("img");
     img.src = playerImage.src;
     img.style.width = "6rem";
@@ -196,37 +209,33 @@
     charPreview.appendChild(img);
     menu.insertBefore(charPreview, startBtn);
   
-    // 🎵 Background Music
+    // 🎵 Background Music Setup
     const bgMusic = new Audio("sound/kendrick.mp3");
     bgMusic.loop = true;
-    bgMusic.volume = 0;
+    bgMusic.volume = 0.5; // Slightly reduced volume
   
     function fadeInMusic() {
-      let vol = 0;
-      const fade = setInterval(() => {
-        if (vol < 0.5) {
-          vol += 0.05;
-          bgMusic.volume = vol;
-        } else clearInterval(fade);
-      }, 200);
-    }
-  
-    function fadeOutMusic() {
-      let vol = bgMusic.volume;
-      const fade = setInterval(() => {
-        if (vol > 0) {
-          vol -= 0.05;
-          bgMusic.volume = Math.max(vol, 0);
-        } else {
-          clearInterval(fade);
-          bgMusic.pause();
-        }
-      }, 200);
+      if (bgMusic.paused) {
+        bgMusic.currentTime = 0;
+        bgMusic.play().catch(() => {
+          console.log("User interaction required to start audio");
+        });
+      }
     }
   
     function initGame() {
+      const isMobile = window.innerWidth < 768; // detect again for resizing
+  
       game = {
-        player: { x: canvas.width / 2, y: 300, vx: 0, vy: 0, w: 65, h: 75, grounded: false },
+        player: {
+          x: canvas.width / 2,
+          y: 300,
+          vx: 0,
+          vy: 0,
+          w: isMobile ? 90 : 65,   // 📱 Larger player on mobile
+          h: isMobile ? 100 : 75,
+          grounded: false,
+        },
         platforms: [],
         camera: { y: 0 },
         score: 0,
@@ -234,15 +243,24 @@
         startTime: Date.now(),
       };
   
+      // Generate starting platforms
+      const baseY = 500;
       for (let i = 0; i < 10; i++) {
         game.platforms.push({
           x: Math.random() * (canvas.width - 100),
-          y: 400 - i * 80,
+          y: baseY - i * 80,
           w: 80 + Math.random() * 40,
           h: 15,
-          type: Math.random() > 0.8 ? "boost" : "normal"
+          type: Math.random() > 0.8 ? "boost" : "normal",
         });
       }
+  
+      // ✅ Place player on the first platform
+      const firstPlat = game.platforms[0];
+      game.player.y = firstPlat.y - game.player.h - 5;
+      game.player.x = firstPlat.x + firstPlat.w / 2 - game.player.w / 2;
+      game.player.vy = 0;
+      game.player.grounded = true;
     }
   
     function startGame() {
@@ -250,13 +268,7 @@
       gameOverScreen.style.display = "none";
       initGame();
       gameState = "playing";
-  
-      // 🎶 Start music
-      bgMusic.currentTime = 0;
-      bgMusic.play().then(() => fadeInMusic()).catch(() => {
-        console.log("User interaction required to start audio");
-      });
-  
+      fadeInMusic(); // 🎶 Start or resume music
       requestAnimationFrame(loop);
     }
   
@@ -270,7 +282,6 @@
         <p>Time: <b>${((Date.now() - game.startTime) / 1000).toFixed(1)}s</b></p>
       `;
       gameOverScreen.style.display = "flex";
-      fadeOutMusic();
     }
   
     function loop() {
@@ -302,15 +313,12 @@
           p.y = plat.y - p.h;
           p.vy = plat.type === "boost" ? -22 : -15;
           p.grounded = true;
-  
           const platformScore = Math.floor(-plat.y / 80);
           if (platformScore > game.score) game.score = platformScore;
         }
       }
   
-      if (p.y < canvas.height / 2) {
-        game.camera.y = p.y - canvas.height / 2;
-      }
+      if (p.y < canvas.height / 2) game.camera.y = p.y - canvas.height / 2;
   
       const currentHeight = Math.max(0, Math.floor(-game.camera.y / 10));
       if (currentHeight > game.maxHeight) game.maxHeight = currentHeight;
@@ -322,7 +330,7 @@
           y: highestY - 80,
           w: 80 + Math.random() * 40,
           h: 15,
-          type: Math.random() > 0.85 ? "boost" : "normal"
+          type: Math.random() > 0.85 ? "boost" : "normal",
         });
       }
   
@@ -398,47 +406,35 @@
     });
     window.addEventListener("keyup", e => (keys[e.key] = false));
   
-    startBtn.addEventListener("click", startGame);
-    restartBtn.addEventListener("click", startGame);
-  
-    // 📱 Mobile Touch Controls
-    let touchStartX = 0;
-    let touchStartY = 0;
-    let touchEndX = 0;
-    let touchEndY = 0;
-  
+    // 📱 Touch Controls for Mobile
+    let touchStartX = null;
     canvas.addEventListener("touchstart", e => {
-      const touch = e.touches[0];
-      touchStartX = touch.clientX;
-      touchStartY = touch.clientY;
-    });
-  
-    canvas.addEventListener("touchmove", e => {
-      const touch = e.touches[0];
-      touchEndX = touch.clientX;
-      touchEndY = touch.clientY;
-    });
-  
-    canvas.addEventListener("touchend", () => {
-      const dx = touchEndX - touchStartX;
-      const dy = touchEndY - touchStartY;
-  
-      if (Math.abs(dx) > Math.abs(dy)) {
-        // Horizontal swipe
-        if (dx > 30) {
-          keys["ArrowRight"] = true;
-          setTimeout(() => (keys["ArrowRight"] = false), 200);
-        } else if (dx < -30) {
-          keys["ArrowLeft"] = true;
-          setTimeout(() => (keys["ArrowLeft"] = false), 200);
-        }
-      } else if (dy < -30 && game.player.grounded) {
-        // Swipe up
+      touchStartX = e.touches[0].clientX;
+      if (game.player.grounded) {
         game.player.vy = -15;
         game.player.grounded = false;
       }
     });
+    canvas.addEventListener("touchmove", e => {
+      const dx = e.touches[0].clientX - touchStartX;
+      if (dx > 30) {
+        keys["ArrowRight"] = true;
+        keys["ArrowLeft"] = false;
+      } else if (dx < -30) {
+        keys["ArrowLeft"] = true;
+        keys["ArrowRight"] = false;
+      }
+    });
+    canvas.addEventListener("touchend", () => {
+      keys["ArrowLeft"] = false;
+      keys["ArrowRight"] = false;
+    });
+  
+    // Start and Restart Buttons
+    startBtn.addEventListener("click", startGame);
+    restartBtn.addEventListener("click", startGame);
   </script>
+  
   
 
   
