@@ -176,11 +176,11 @@
     let highScore = 0;
     let game, keys = {};
   
-    // 🟡 Default player image (used both in menu & game)
+    // 🟡 Default player image
     const playerImage = new Image();
-    playerImage.src = "images/monty-mole.webp"; // replace with your Honk image path
+    playerImage.src = "images/monty-mole.webp"; // replace with your image path
   
-    // Add Honk image preview above Start button
+    // Character preview above Start button
     const charPreview = document.createElement("div");
     charPreview.style.display = "flex";
     charPreview.style.justifyContent = "center";
@@ -194,11 +194,10 @@
     img.style.transition = "transform 0.3s ease";
     img.style.transform = "scale(1.05)";
     charPreview.appendChild(img);
-  
     menu.insertBefore(charPreview, startBtn);
   
-    // 🎵 Background Music Setup
-    const bgMusic = new Audio("sound/kendrick.mp3"); // replace with your file
+    // 🎵 Background Music
+    const bgMusic = new Audio("sound/kendrick.mp3");
     bgMusic.loop = true;
     bgMusic.volume = 0;
   
@@ -234,6 +233,7 @@
         maxHeight: 0,
         startTime: Date.now(),
       };
+  
       for (let i = 0; i < 10; i++) {
         game.platforms.push({
           x: Math.random() * (canvas.width - 100),
@@ -251,7 +251,7 @@
       initGame();
       gameState = "playing";
   
-      // 🎶 Start music with fade in
+      // 🎶 Start music
       bgMusic.currentTime = 0;
       bgMusic.play().then(() => fadeInMusic()).catch(() => {
         console.log("User interaction required to start audio");
@@ -270,8 +270,6 @@
         <p>Time: <b>${((Date.now() - game.startTime) / 1000).toFixed(1)}s</b></p>
       `;
       gameOverScreen.style.display = "flex";
-  
-      // ⏸ Fade out and stop music
       fadeOutMusic();
     }
   
@@ -390,6 +388,7 @@
       ctx.restore();
     }
   
+    // 🎮 Keyboard Controls
     window.addEventListener("keydown", e => {
       keys[e.key] = true;
       if (e.key === " " && game.player.grounded) {
@@ -401,6 +400,44 @@
   
     startBtn.addEventListener("click", startGame);
     restartBtn.addEventListener("click", startGame);
+  
+    // 📱 Mobile Touch Controls
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchEndX = 0;
+    let touchEndY = 0;
+  
+    canvas.addEventListener("touchstart", e => {
+      const touch = e.touches[0];
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+    });
+  
+    canvas.addEventListener("touchmove", e => {
+      const touch = e.touches[0];
+      touchEndX = touch.clientX;
+      touchEndY = touch.clientY;
+    });
+  
+    canvas.addEventListener("touchend", () => {
+      const dx = touchEndX - touchStartX;
+      const dy = touchEndY - touchStartY;
+  
+      if (Math.abs(dx) > Math.abs(dy)) {
+        // Horizontal swipe
+        if (dx > 30) {
+          keys["ArrowRight"] = true;
+          setTimeout(() => (keys["ArrowRight"] = false), 200);
+        } else if (dx < -30) {
+          keys["ArrowLeft"] = true;
+          setTimeout(() => (keys["ArrowLeft"] = false), 200);
+        }
+      } else if (dy < -30 && game.player.grounded) {
+        // Swipe up
+        game.player.vy = -15;
+        game.player.grounded = false;
+      }
+    });
   </script>
   
 
